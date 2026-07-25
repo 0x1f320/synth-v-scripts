@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Synthesizer V Studio 2 scripts, written in TypeScript and built to minified JS.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0x1f320/synth-v-scripts.git"
+  },
   "packageManager": "pnpm@10.15.0",
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -13,7 +17,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
+    "conventional-changelog-conventionalcommits": "^10.2.1",
     "esbuild": "^0.28.1",
+    "semantic-release": "^25.0.8",
     "typescript": "^7.0.2"
   },
   "pnpm": {
