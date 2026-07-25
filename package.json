@@ -10,13 +10,14 @@
   "packageManager": "pnpm@10.15.0",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit && esbuild src/*.ts --bundle --minify --format=iife --platform=neutral --target=es5 --charset=utf8 --alias:@=./src --outdir=dist",
+    "build": "tsc --noEmit && node build.mjs",
     "lint": "biome lint .",
     "check": "biome check .",
     "format": "biome format --write ."
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.5",
+    "@swc/core": "^1.15.46",
     "conventional-changelog-conventionalcommits": "^10.2.1",
     "esbuild": "^0.28.1",
     "semantic-release": "^25.0.8",
@@ -24,6 +25,7 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@swc/core",
       "esbuild"
     ]
   }
