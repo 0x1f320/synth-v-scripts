@@ -2,6 +2,8 @@
   "name": "synth-v",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "author": "0x1F320 <me@0x1f320.sh>",
   "description": "Synthesizer V Studio 2 scripts, written in TypeScript and built to minified JS.",
   "repository": {
     "type": "git",
