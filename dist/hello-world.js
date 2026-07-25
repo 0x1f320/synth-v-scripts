@@ -1,0 +1,1 @@
+"use strict";(function(){function o(n){return function(){return{name:n,category:"0x1F956",author:"0x1F320",versionNumber:1,minEditorVersion:0}}}function i(){SV.showMessageBox("Hello World","Hello World!"),SV.finish()}globalThis.getClientInfo=o("Hello World");globalThis.main=i;})();

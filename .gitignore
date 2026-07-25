@@ -1,0 +1,7 @@
+node_modules/
+*.log
+.DS_Store
+
+# local-only files, never committed
+*.local.sh
+*.local.mjs
