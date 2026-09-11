@@ -12,7 +12,9 @@
   "packageManager": "pnpm@10.15.0",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit && node build.mjs",
+    "build": "pnpm build:js && pnpm build:lua",
+    "build:js": "tsc --noEmit && node build.mjs",
+    "build:lua": "tstl -p tsconfig.lua.json",
     "lint": "biome lint .",
     "check": "biome check .",
     "format": "biome format --write ."
@@ -22,8 +24,10 @@
     "@swc/core": "^1.15.46",
     "conventional-changelog-conventionalcommits": "^10.2.1",
     "esbuild": "^0.28.1",
+    "lua-types": "^2.14.1",
     "semantic-release": "^25.0.8",
-    "typescript": "^7.0.2"
+    "typescript": "6.0.2",
+    "typescript-to-lua": "^1.37.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

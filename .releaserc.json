@@ -34,9 +34,7 @@
     [
       "@semantic-release/github",
       {
-        "assets": [
-          { "path": "dist/*.js" }
-        ]
+        "assets": [{ "path": "dist/*.js" }, { "path": "dist/*.lua" }]
       }
     ]
   ]

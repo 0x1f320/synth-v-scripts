@@ -14,7 +14,7 @@ interface WidgetValue {
   setValue(value: any): void;
   getEnabled(): boolean;
   setEnabled(enabled: boolean): void;
-  setValueChangeCallback(callback: () => void): void;
+  setValueChangeCallback(callback: (this: void, value?: any) => void): void;
 }
 
 interface CoordinateSystem {
@@ -59,7 +59,26 @@ interface Automation {
   add(b: Blick, value: number): void;
   remove(from: Blick, to: Blick): void;
   getPoints(from: Blick, to: Blick): Array<[Blick, number]>;
-  getDefinition(): { defaultValue: number; [key: string]: any };
+  getDefinition(): { defaultValue: number; range?: [number, number]; [key: string]: any };
+  [key: string]: any;
+}
+
+interface VocalModeParams {
+  pitch?: number;
+  timbre?: number;
+  pronunciation?: number;
+  [key: string]: any;
+}
+
+interface VoiceAttributes {
+  paramLoudness?: number;
+  paramTension?: number;
+  paramBreathiness?: number;
+  paramGender?: number;
+  paramToneShift?: number;
+  vocalModeInherited?: boolean;
+  vocalModePreset?: string;
+  vocalModeParams?: { [name: string]: VocalModeParams };
   [key: string]: any;
 }
 
@@ -91,7 +110,8 @@ interface NoteGroupReference {
   isMain(): boolean;
   isMuted(): boolean;
   setMuted(muted: boolean): void;
-  getVoice(): unknown;
+  getVoice(): VoiceAttributes;
+  setVoice(voice: VoiceAttributes): void;
   getIndexInParent(): number;
   getParent(): Track;
   clone(): NoteGroupReference;
@@ -145,8 +165,8 @@ interface SelectionState {
   hasSelectedContent(): boolean;
   clearAll(): void;
   selectNote(note: Note): void;
-  registerSelectionCallback(callback: (type: string, selected: boolean) => void): void;
-  registerClearCallback(callback: (type: string) => void): void;
+  registerSelectionCallback(callback: (this: void, type: string, selected: boolean) => void): void;
+  registerClearCallback(callback: (this: void, type: string) => void): void;
   [key: string]: any;
 }
 
@@ -185,7 +205,7 @@ interface HostInfo {
 }
 
 interface SVDialogResult {
-  status: boolean;
+  status: boolean | "Yes" | "No" | "Cancel" | "Ok";
   answers: { [name: string]: any };
 }
 
@@ -239,11 +259,16 @@ interface SVHost {
   setHostClipboard(text: string): void;
 
   showMessageBox(title: string, message: string): void;
-  showCustomDialog(form: SVCustomDialogForm): SVDialogResult;
+  showMessageBoxAsync(title: string, message: string, callback: (this: void) => void): void;
+  showCustomDialog(form: SVCustomDialogForm): SVDialogResult | undefined;
+  showCustomDialogAsync(
+    form: SVCustomDialogForm,
+    callback: (this: void, result: SVDialogResult | undefined) => void,
+  ): void;
   showInputBox(title: string, message: string, defaultText: string): string;
   refreshSidePanel(): void;
 
-  setTimeout(milliseconds: number, callback: () => void): void;
+  setTimeout(milliseconds: number, callback: (this: void) => void): void;
 
   blick2Quarter(b: Blick): number;
   quarter2Blick(q: number): Blick;
