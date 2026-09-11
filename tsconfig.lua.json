@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "types": ["lua-types/5.4"],
+    "noEmit": false,
+    "rootDir": ".",
+    "outDir": "dist"
+  },
+  "tstl": {
+    "luaTarget": "5.4",
+    "luaBundle": "parameter-control.lua",
+    "luaBundleEntry": "src/parameter-control.ts",
+    "sourceMapTraceback": true
+  },
+  "include": [
+    "src/parameter-control.ts",
+    "src/common/client-info.ts",
+    "src/common/parameter-control-targets.ts",
+    "src/types/**/*.d.ts"
+  ]
+}

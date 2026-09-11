@@ -18,13 +18,24 @@ A side panel that keeps the editor centered on whatever is currently playing.
 - **Track focusing** — automatically switches the current track/group to whatever plays under the playhead. Choose which tracks to consider, or toggle the whole feature off.
 - **Playhead position** — a slider for where the playhead sits in the viewport while playing. Ranges from 0.05 to 0.95, where value × 100% is the horizontal position from the left (e.g. 0.25 → 25%).
 
+### Parameter Control — `parameter-control.js`, `parameter-control.lua`
+
+A side panel for applying a delta to parameter curves over the selected notes.
+
+- Choose a base parameter, including Tone Shift, Mouth Opening, and Rap Intonation.
+- Choose a base parameter or a specific **Vocal Mode** entry directly from the Target dropdown. Vocal mode entries are read from the selected group's defined vocal modes, falling back to the current group when no group is selected.
+- Use **Define Preset...** at the end of the Target dropdown to create an in-memory preset. In the dialog, set a preset name and move the sliders for every target the preset should control; zero-valued sliders are ignored.
+- Selecting a saved preset changes the Delta slider to percent mode. Applying a preset uses `entry amount * delta percent`, so a `0.5` Tension entry with Delta `50%` applies `0.25`.
+- Adjust the delta with a slider, then apply it to the selected notes' time ranges.
+- If no notes are selected, the script shows a warning dialog instead of editing the project.
+
 ### Hello World — `hello-world.js`
 
 A minimal example script, handy as a template for new scripts.
 
 ## Installation
 
-1. On the [Releases page](https://github.com/0x1f320/synth-v-scripts/releases), download the `.js` file(s) you want from the latest release (or any specific version).
+1. On the [Releases page](https://github.com/0x1f320/synth-v-scripts/releases), download the `.js` or `.lua` file(s) you want from the latest release (or any specific version).
 2. Drop them into the Synthesizer V Studio 2 scripts folder:
 
    | OS | Path |
@@ -38,18 +49,21 @@ A minimal example script, handy as a template for new scripts.
 
 ## Development
 
-Stack: **TypeScript** · **esbuild** (bundling) + **SWC** (ES5 downleveling) · **Biome** (lint/format) · **semantic-release** · **pnpm**.
+Stack: **TypeScript** · **esbuild** (JS bundling) + **SWC** (ES5 downleveling) · **typescript-to-lua** (Lua bundling) · **Biome** (lint/format) · **semantic-release** · **pnpm**.
 
-> The Studio 2 scripting engine is ES5-only — no arrow functions, classes, or `let`/`const`. The build bundles each entry with esbuild and downlevels the result to ES5 with SWC, so the source stays modern TypeScript while the output runs in the editor.
+> Studio 2 JavaScript scripts are ES5-only — no arrow function, class, or `let`/`const` syntax. The JS build bundles each entry with esbuild and downlevels it with SWC. Parameter Control also has a Lua 5.4 build through typescript-to-lua.
 
 ```sh
 pnpm install
-pnpm build       # type-check, bundle, and downlevel every src/*.ts to dist/
+pnpm build       # build JS scripts and Parameter Control's Lua bundle into dist/
 ```
 
 | Command | Description |
 | --- | --- |
-| `pnpm build` | Type-check, bundle, and downlevel every `src/*.ts` to `dist/`. |
+| `pnpm build` | Build JS scripts and `parameter-control.lua` into `dist/`. |
+| `pnpm build:js` | Type-check, bundle, and downlevel every top-level `src/*.ts` entry to `dist/*.js`. |
+| `pnpm build:lua` | Compile `src/parameter-control.ts` to `dist/parameter-control.lua`. |
+| `pnpm test` | Run focused Node tests for shared script logic. |
 | `pnpm typecheck` | Type-check only (`tsc --noEmit`). |
 | `pnpm lint` | Lint with Biome. |
 | `pnpm check` | Biome lint + format check. |
