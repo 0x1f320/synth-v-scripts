@@ -191,6 +191,10 @@ export function buildParameterControlRows(input: ParameterControlRowsInput): SVP
         },
       ],
     },
+    {
+      type: "Container",
+      columns: [{ type: "Button", text: "Invert", value: input.invertValue, width: 1 }],
+    },
     { type: "Label", text: "Easing" },
     {
       type: "Container",
@@ -237,10 +241,7 @@ export function buildParameterControlRows(input: ParameterControlRowsInput): SVP
     },
     {
       type: "Container",
-      columns: [
-        { type: "Button", text: "Apply", value: input.applyValue, width: 1 },
-        { type: "Button", text: "Invert", value: input.invertValue, width: 1 },
-      ],
+      columns: [{ type: "Button", text: "Apply", value: input.applyValue, width: 1 }],
     },
     {
       type: "Container",
