@@ -5,6 +5,9 @@ on:
     branches: [main, dev]
   pull_request:
     branches: [main, dev]
+  pull_request_target:
+    types: [closed]
+    branches: [main, dev]
 
 permissions:
   contents: write
@@ -14,11 +17,13 @@ permissions:
 
 jobs:
   ci:
+    if: github.event_name != 'pull_request_target'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
 
@@ -36,6 +41,76 @@ jobs:
       - run: pnpm build
 
       - if: github.event_name == 'push'
+        name: Configure release credentials
+        run: |
+          if [ -z "${SEMANTIC_RELEASE_TOKEN}" ]; then
+            echo "SEMANTIC_RELEASE_TOKEN is required to push release commits to protected branches."
+            exit 1
+          fi
+          git remote set-url origin "https://x-access-token:${SEMANTIC_RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          SEMANTIC_RELEASE_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
+
+      - if: github.event_name == 'push'
         run: pnpm exec semantic-release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
+
+  release-on-skipped-merge:
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: skip_check
+        run: |
+          message="$(git log -1 --format=%B "${{ github.event.pull_request.merge_commit_sha }}")"
+          if printf '%s' "$message" | grep -Eiq '\[(skip ci|ci skip|no ci|skip actions|actions skip)\]|skip-checks:[[:space:]]*true'; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        uses: pnpm/action-setup@v4
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        run: pnpm lint
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        run: pnpm typecheck
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        run: pnpm build
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        name: Configure release credentials
+        run: |
+          if [ -z "${SEMANTIC_RELEASE_TOKEN}" ]; then
+            echo "SEMANTIC_RELEASE_TOKEN is required to push release commits to protected branches."
+            exit 1
+          fi
+          git remote set-url origin "https://x-access-token:${SEMANTIC_RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+        env:
+          SEMANTIC_RELEASE_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        run: pnpm exec semantic-release
+        env:
+          GITHUB_EVENT_NAME: push
+          GITHUB_REF: refs/heads/${{ github.event.pull_request.base.ref }}
+          GITHUB_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          GITHUB_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
