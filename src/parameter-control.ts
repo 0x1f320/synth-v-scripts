@@ -101,11 +101,27 @@ declare const os:
   | undefined;
 
 const SCRIPT_TITLE = "Parameter Control";
-const PRESET_STORE_FILE_NAME = ".parameter-control.json";
+const PRESET_STORE_FILE_PREFIX = ".parameter-control.";
+const PRESET_STORE_FILE_SUFFIX = ".json";
 const DEBUG_LOG_FILE_NAME = ".parameter-control-debug.log";
 const RESTORE_OFFSET = 1;
 const CONTEXT_WATCH_INTERVAL = 500;
 const PRESET_DIALOG_DELAY = 16;
+const UNKNOWN_VOICEBANK_SCOPE_KEY = "unknown-voicebank";
+const VOICEBANK_IDENTIFIER_KEYS: { [key: string]: boolean } = {
+  database: true,
+  databaseid: true,
+  databaseuuid: true,
+  databasename: true,
+  dbid: true,
+  dbname: true,
+  voicebank: true,
+  voicebankid: true,
+  voicebankuuid: true,
+  voicebankname: true,
+  voiceid: true,
+  voicename: true,
+};
 const PRESET_DELTA_CHOICE: ParameterChoice = {
   label: "Preset",
   typeName: "",
@@ -219,7 +235,8 @@ class ParameterControlPanel {
   private readonly deletePresetButton = SV.create("WidgetValue");
   private readonly applyButton = SV.create("WidgetValue");
   private readonly invertButton = SV.create("WidgetValue");
-  private readonly presetStore = createPresetFileStore();
+  private presetStore = createPresetFileStore(UNKNOWN_VOICEBANK_SCOPE_KEY);
+  private presetStoreScopeKey = UNKNOWN_VOICEBANK_SCOPE_KEY;
   private presets: ParameterPreset[] = [];
   private readonly deltaByTarget: TargetStoredValues = {};
   private readonly controlWrites: ControlWriteRecords = {};
@@ -233,7 +250,7 @@ class ParameterControlPanel {
   private restoringDeltaValue = false;
 
   constructor() {
-    this.loadStoredState();
+    this.loadPresetStoreForScope(this.currentVoicebankScopeKey());
     debugLog("panel constructed");
     this.persistState();
     this.definePresetButton.setValue(false);
@@ -273,6 +290,7 @@ class ParameterControlPanel {
   }
 
   getState(): SVSidePanelState {
+    this.ensurePresetStoreForCurrentVoicebank();
     const choices = this.targetChoices();
     this.ensureParameterIndex(choices);
     const choice = this.currentDeltaChoice(choices);
@@ -947,6 +965,48 @@ class ParameterControlPanel {
     this.restoreSettings(store.settings);
   }
 
+  private ensurePresetStoreForCurrentVoicebank(): void {
+    const scopeKey = this.currentVoicebankScopeKey();
+    if (scopeKey === this.presetStoreScopeKey) {
+      return;
+    }
+
+    const previousScopeKey = this.presetStoreScopeKey;
+    this.persistState();
+    debugLog(`Define Preset: preset scope changed ${previousScopeKey} -> ${scopeKey}`);
+    this.loadPresetStoreForScope(scopeKey);
+  }
+
+  private loadPresetStoreForScope(scopeKey: string): void {
+    this.presetStoreScopeKey = scopeKey;
+    this.presetStore = createPresetFileStore(scopeKey);
+    this.presetStoreWarningShown = false;
+    this.resetStoredStateDefaults();
+    this.loadStoredState();
+  }
+
+  private resetStoredStateDefaults(): void {
+    this.loadingStoredState = true;
+    this.presets = [];
+    this.clearObject(this.deltaByTarget);
+    this.clearObject(this.controlWrites);
+    this.nextPresetId = 1;
+    this.lastParameterIndex = 0;
+    this.setParameterIndex(0);
+    this.delta.setValue(0);
+    this.easing.setValue(0);
+    this.easingLeft.setValue(true);
+    this.easingRight.setValue(true);
+    this.easingPlacement.setValue(0);
+    this.loadingStoredState = false;
+  }
+
+  private clearObject<T>(value: { [key: string]: T }): void {
+    for (const key in value) {
+      delete value[key];
+    }
+  }
+
   private restoreSettings(settings: ParameterControlSettings | undefined): void {
     if (!settings) {
       return;
@@ -1044,7 +1104,7 @@ class ParameterControlPanel {
     debugLog("Define Preset: preset store write failed");
     if (!this.presetStoreWarningShown) {
       this.presetStoreWarningShown = true;
-      this.showMessage(`Could not save presets to ${PRESET_STORE_FILE_NAME}.`);
+      this.showMessage(`Could not save presets to ${String(this.presetStore.path)}.`);
     }
   }
 
@@ -1096,7 +1156,7 @@ class ParameterControlPanel {
   private contextSignature(): string {
     try {
       const reference = this.currentReference();
-      return `${reference.getTarget().getUUID()}:${this.vocalModeNames().join(",")}`;
+      return `${this.currentVoicebankScopeKey()}:${reference.getTarget().getUUID()}:${this.vocalModeNames().join(",")}`;
     } catch (_error) {
       return "";
     }
@@ -1105,11 +1165,33 @@ class ParameterControlPanel {
   private watchContext(): void {
     const signature = this.contextSignature();
     if (signature !== this.lastContextSignature) {
+      this.ensurePresetStoreForCurrentVoicebank();
       this.lastContextSignature = signature;
       this.ensureParameterIndex(this.targetChoices());
       SV.refreshSidePanel();
     }
     SV.setTimeout(CONTEXT_WATCH_INTERVAL, () => this.watchContext());
+  }
+
+  private currentVoicebankScopeKey(): string {
+    const context = this.currentVoiceContext();
+    const voicebankId = voicebankIdentifierFromContext({
+      referenceData: context.referenceData,
+      groupData: context.groupData,
+      voice: context.voice,
+      voiceData: context.voiceData,
+    });
+    if (voicebankId) {
+      return `voicebank-${stableScopeToken(voicebankId)}`;
+    }
+    try {
+      if (context.reference) {
+        return `group-${stableScopeToken(context.reference.getTarget().getUUID())}`;
+      }
+    } catch (_error) {
+      // Fall through to the explicit unknown scope.
+    }
+    return UNKNOWN_VOICEBANK_SCOPE_KEY;
   }
 
   private registerSelectionRefreshCallbacks(): void {
@@ -1606,8 +1688,8 @@ class ParameterControlPanel {
   }
 }
 
-function createPresetFileStore(): PresetFileStore {
-  const path = presetStorePath();
+function createPresetFileStore(scopeKey: string): PresetFileStore {
+  const path = presetStorePath(scopeKey);
   if (!path || typeof io === "undefined") {
     return {
       available: false,
@@ -1624,8 +1706,114 @@ function createPresetFileStore(): PresetFileStore {
   };
 }
 
-function presetStorePath(): string | undefined {
-  return scriptSiblingPath(PRESET_STORE_FILE_NAME);
+function presetStorePath(scopeKey: string): string | undefined {
+  return scriptSiblingPath(presetStoreFileName(scopeKey));
+}
+
+function presetStoreFileName(scopeKey: string): string {
+  if (scopeKey === UNKNOWN_VOICEBANK_SCOPE_KEY) {
+    return `${PRESET_STORE_FILE_PREFIX}${UNKNOWN_VOICEBANK_SCOPE_KEY}${PRESET_STORE_FILE_SUFFIX}`;
+  }
+  const token = stableScopeToken(scopeKey);
+  return `${PRESET_STORE_FILE_PREFIX}${token}${PRESET_STORE_FILE_SUFFIX}`;
+}
+
+function voicebankIdentifierFromContext(value: unknown): string | undefined {
+  const identifiers: string[] = [];
+  collectVoicebankIdentifiers(identifiers, value, [], 0);
+  return identifiers[0];
+}
+
+function collectVoicebankIdentifiers(
+  identifiers: string[],
+  value: unknown,
+  visited: unknown[],
+  depth: number,
+): void {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  if (depth > 5 || visited.indexOf(value) >= 0) {
+    return;
+  }
+
+  const object = value as { [key: string]: unknown };
+  const nextVisited = visited.concat([value]);
+  for (const key in object) {
+    const child = object[key];
+    if (VOICEBANK_IDENTIFIER_KEYS[normalizeIdentifierKey(key)]) {
+      const identifier = primitiveIdentifierText(child);
+      if (identifier) {
+        identifiers.push(`${key}:${identifier}`);
+      }
+    }
+    if (child && typeof child === "object") {
+      collectVoicebankIdentifiers(identifiers, child, nextVisited, depth + 1);
+    }
+  }
+}
+
+function normalizeIdentifierKey(key: string): string {
+  let result = "";
+  const text = String(key).toLowerCase();
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text.charAt(index);
+    if ((char >= "a" && char <= "z") || (char >= "0" && char <= "9")) {
+      result += char;
+    }
+  }
+  return result;
+}
+
+function primitiveIdentifierText(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = trimAsciiWhitespace(value);
+    return trimmed || undefined;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  return undefined;
+}
+
+function stableScopeToken(value: string): string {
+  const normalized = value.toLowerCase();
+  let token = "";
+  for (let index = 0; index < normalized.length; index += 1) {
+    const char = normalized.charAt(index);
+    if ((char >= "a" && char <= "z") || (char >= "0" && char <= "9")) {
+      token += char;
+    } else if (token.charAt(token.length - 1) !== "-") {
+      token += "-";
+    }
+  }
+  token = trimTokenSeparators(token);
+  if (token.length > 72) {
+    token = token.substring(0, 72);
+    token = trimTokenSeparators(token);
+  }
+  const hash = stableTextHash(value);
+  return token.length > 0 ? `${token}-${hash}` : hash;
+}
+
+function trimTokenSeparators(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value.charAt(start) === "-") {
+    start += 1;
+  }
+  while (end > start && value.charAt(end - 1) === "-") {
+    end -= 1;
+  }
+  return value.substring(start, end);
+}
+
+function stableTextHash(value: string): string {
+  let hash = 5381;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 33 + value.charCodeAt(index)) % 4294967296;
+  }
+  return String(Math.floor(hash));
 }
 
 function debugLog(message: string): void {
