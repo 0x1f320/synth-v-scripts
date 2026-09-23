@@ -40,6 +40,8 @@ jobs:
 
       - run: pnpm build
 
+      - run: node --test tests/growl.test.mjs
+
       - if: github.event_name == 'push'
         name: Configure release credentials
         run: |
@@ -95,6 +97,9 @@ jobs:
 
       - if: steps.skip_check.outputs.should_run == 'true'
         run: pnpm build
+
+      - if: steps.skip_check.outputs.should_run == 'true'
+        run: node --test tests/growl.test.mjs
 
       - if: steps.skip_check.outputs.should_run == 'true'
         name: Configure release credentials

@@ -11,6 +11,7 @@
   },
   "packageManager": "pnpm@10.15.0",
   "scripts": {
+    "test:growl": "pnpm build:js && node --test tests/growl.test.mjs",
     "typecheck": "tsc --noEmit",
     "build": "pnpm build:js && pnpm build:lua",
     "build:js": "tsc --noEmit && node build.mjs",

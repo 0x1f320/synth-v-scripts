@@ -35,6 +35,7 @@ interface CoordinateSystem {
 }
 
 interface Note {
+  getParent(): NoteGroup;
   getOnset(): Blick;
   getEnd(): Blick;
   getDuration(): Blick;

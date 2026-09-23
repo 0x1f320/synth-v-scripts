@@ -30,6 +30,16 @@
 - 슬라이더로 델타를 조절한 뒤 선택한 노트의 시간 구간에 적용합니다.
 - 선택된 노트가 없으면 프로젝트를 편집하지 않고 경고 다이얼로그를 표시합니다.
 
+### SynthV Growl (Sidebar) — `growl.js`
+
+[PNCSS의 SynthV Growl](https://github.com/crlotwhite/SynthV-Growl)과 같은 피치 패턴을 적용하는 사이드 패널입니다. Synthesizer V Studio **2.1.2 이상**이 필요합니다.
+
+- 노트를 선택하고 **시작 지점**, **끝 지점**(각 노트 길이의 %), **Growl 깊이**(센트), **피치 간격 1/N**을 조절한 뒤 **Growl 적용**을 누릅니다. 기본값은 원본과 같은 `0 / 100 / 90 / 500`입니다.
+- `N`은 선택 구간의 분할 수이며 Hz가 아닙니다. 구간에 `+깊이 / -깊이`를 번갈아 넣습니다.
+- 슬라이더를 움직이는 동안에는 편집하지 않습니다. 값은 패널이 로드된 동안 유지되며, 적용할 때마다 현재 선택을 읽고 Undo 한 번으로 되돌릴 수 있습니다.
+- **적용 구간의 기존 피치 편집은 교체됩니다.** 원본과 동일하게 양 끝 바깥 100 blick 지점에 0 앵커를 추가합니다. 적용 구간 바깥으로 이어지는 커브의 보간에도 영향을 줄 수 있습니다.
+- 성공 확인창 없이 반복 적용할 수 있습니다. 기존 `synthvGrowl.lua`와 별도 파일이므로 함께 설치할 수 있습니다.
+
 ### Hello World — `hello-world.js`
 
 새 스크립트 작성용 최소 예제/템플릿.
@@ -65,6 +75,7 @@ pnpm build       # JS 스크립트와 Lua-only Parameter Control 번들을 dist/
 | `pnpm build:js` | JavaScript 스크립트 엔트리를 타입체크·번들·ES5 다운레벨해 `dist/*.js`로 출력. `src/parameter-control.ts`는 Parameter Control이 Lua로만 배포되기 때문에 의도적으로 제외됩니다. |
 | `pnpm build:lua` | `src/parameter-control.ts`를 `dist/parameter-control.lua`로 컴파일. |
 | `pnpm typecheck` | 타입체크만 (`tsc --noEmit`). |
+| `pnpm test:growl` | JS 번들을 빌드하고 SynthV 호스트 대역으로 Growl 선택 범위·피치 편집·Undo 동작을 검증합니다. 실제 앱 검증과는 별개입니다. |
 | `pnpm lint` | Biome 린트. |
 | `pnpm check` | Biome 린트 + 포맷 검사. |
 | `pnpm format` | Biome로 코드 포맷. |

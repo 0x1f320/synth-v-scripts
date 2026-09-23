@@ -30,6 +30,16 @@ A side panel for applying a delta to parameter curves over the selected notes.
 - Adjust the delta with a slider, then apply it to the selected notes' time ranges.
 - If no notes are selected, the script shows a warning dialog instead of editing the project.
 
+### SynthV Growl (Sidebar) — `growl.js`
+
+A side panel implementing the pitch pattern of [PNCSS's SynthV Growl](https://github.com/crlotwhite/SynthV-Growl). Requires Synthesizer V Studio **2.1.2 or later**.
+
+- Select notes, adjust **Start Position**, **End Position** (percent of each note), **Growl Depth** (cents), and **Pitch frequency 1/N**, then click **Apply Growl**. Defaults match the original: `0 / 100 / 90 / 500`.
+- `N` is the number of subdivisions of the selected range, not Hz. Pitch alternates between positive and negative depth.
+- Moving sliders does not edit the project. Settings remain while the panel is loaded. Each application uses the current selection and creates one undo record.
+- **Existing pitch edits within the range are replaced.** As in the original, zero anchors are inserted 100 blicks outside both ends; interpolation outside the range can also change.
+- Apply repeatedly without a success dialog. The separate file can coexist with the original `synthvGrowl.lua`.
+
 ### Hello World — `hello-world.js`
 
 A minimal example script, handy as a template for new scripts.
@@ -65,6 +75,7 @@ pnpm build       # build JS scripts and the Lua-only Parameter Control bundle in
 | `pnpm build:js` | Type-check, bundle, and downlevel JavaScript script entries to `dist/*.js`; `src/parameter-control.ts` is intentionally excluded because Parameter Control is distributed only as Lua. |
 | `pnpm build:lua` | Compile `src/parameter-control.ts` to `dist/parameter-control.lua`. |
 | `pnpm typecheck` | Type-check only (`tsc --noEmit`). |
+| `pnpm test:growl` | Build JS and verify Growl selection ranges, pitch edits, and undo records with a simulated SynthV host. This does not replace in-app testing. |
 | `pnpm lint` | Lint with Biome. |
 | `pnpm check` | Biome lint + format check. |
 | `pnpm format` | Format the codebase with Biome. |
