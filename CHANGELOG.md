@@ -1,3 +1,9 @@
+## [1.1.0-dev.5](https://github.com/0x1f320/synth-v-scripts/compare/v1.1.0-dev.4...v1.1.0-dev.5) (2026-10-12)
+
+### Bug Fixes
+
+* **release:** restore missing release notes ([#13](https://github.com/0x1f320/synth-v-scripts/issues/13)) ([94c6e7f](https://github.com/0x1f320/synth-v-scripts/commit/94c6e7fc461355a77c656e4c5e01581e958beb77))
+
 ## [1.1.0-dev.4](https://github.com/0x1f320/synth-v-scripts/compare/v1.1.0-dev.3...v1.1.0-dev.4) (2026-10-12)
 
 ### Bug Fixes
