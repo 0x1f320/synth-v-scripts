@@ -12,6 +12,7 @@
   "packageManager": "pnpm@10.15.0",
   "scripts": {
     "test": "pnpm build:js && node --test tests/*.test.mjs",
+    "test:lua": "pnpm build:lua && lua tests/parameter-control.test.lua",
     "typecheck": "tsc --noEmit",
     "build": "pnpm build:js && pnpm build:lua",
     "build:js": "tsc --noEmit && node build.mjs",

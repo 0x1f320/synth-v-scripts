@@ -56,6 +56,7 @@ export interface ParameterPresetStore {
 }
 
 export interface ParameterControlSettings {
+  importedLegacyScopes?: string[];
   selectedTargetKey?: string;
   deltaByTarget?: TargetStoredValues;
   easingAmount?: number;
@@ -391,6 +392,9 @@ function presetEntryJson(entry: ParameterPresetEntry): { [key: string]: JsonValu
 
 function settingsJson(settings: ParameterControlSettings): { [key: string]: JsonValue } {
   const result: { [key: string]: JsonValue } = {};
+  if (settings.importedLegacyScopes) {
+    result.importedLegacyScopes = settings.importedLegacyScopes;
+  }
   if (settings.selectedTargetKey) {
     result.selectedTargetKey = settings.selectedTargetKey;
   }
@@ -469,6 +473,11 @@ function normalizeStoredSettings(value: JsonValue | undefined): ParameterControl
   }
 
   const settings: ParameterControlSettings = {};
+  if (Array.isArray(value.importedLegacyScopes)) {
+    settings.importedLegacyScopes = value.importedLegacyScopes.filter(
+      (scope): scope is string => typeof scope === "string",
+    );
+  }
   if (typeof value.selectedTargetKey === "string") {
     settings.selectedTargetKey = value.selectedTargetKey;
   }
@@ -1037,7 +1046,7 @@ function leftPad(value: string, length: number): string {
   return result;
 }
 
-function parseJsonValue(text: string): JsonValue {
+export function parseJsonValue(text: string): JsonValue {
   let index = 0;
 
   function skipWhitespace(): void {
