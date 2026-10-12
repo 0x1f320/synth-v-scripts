@@ -1,11 +1,19 @@
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { build } from "esbuild";
 import { transform } from "@swc/core";
 
+const luaOnlyEntryPoints = new Set(["parameter-control.ts"]);
+
 const entryPoints = (await readdir("src"))
-  .filter((f) => f.endsWith(".ts"))
+  .filter((f) => f.endsWith(".ts") && !luaOnlyEntryPoints.has(f))
   .map((f) => `src/${f}`);
+
+await Promise.all(
+  Array.from(luaOnlyEntryPoints).map((file) =>
+    rm(`dist/${file.replace(/\.ts$/, ".js")}`, { force: true }),
+  ),
+);
 
 const bundle = await build({
   entryPoints,
