@@ -14,6 +14,7 @@ A collection of userscripts for [Synthesizer V Studio 2](https://dreamtonics.com
 
 A side panel that keeps the editor centered on whatever is currently playing.
 
+- **Follow Playback State** — check this to follow playback started from Synthesizer V's transport or keyboard shortcuts, including loop playback. Following stops when playback pauses or stops and resumes on the next play. Uncheck to return to the panel's Play/Pause controls; changing the checkbox never starts or pauses audio. Off by default.
 - **Scroll following** — horizontal (time) and vertical (pitch) auto-scroll. Vertical scroll moves smoothly toward the median pitch of the notes around the playhead (1 before, 5 ahead), and you can adjust how long that movement takes (duration, in ms).
 - **Track focusing** — automatically switches the current track/group to whatever plays under the playhead. Choose which tracks to consider, or toggle the whole feature off.
 - **Playhead position** — a slider for where the playhead sits in the viewport while playing. Ranges from 0.05 to 0.95, where value × 100% is the horizontal position from the left (e.g. 0.25 → 25%).
@@ -65,6 +66,7 @@ pnpm build       # build JS scripts and the Lua-only Parameter Control bundle in
 | `pnpm build:js` | Type-check, bundle, and downlevel JavaScript script entries to `dist/*.js`; `src/parameter-control.ts` is intentionally excluded because Parameter Control is distributed only as Lua. |
 | `pnpm build:lua` | Compile `src/parameter-control.ts` to `dist/parameter-control.lua`. |
 | `pnpm typecheck` | Type-check only (`tsc --noEmit`). |
+| `pnpm test` | Build JavaScript and test playback behavior with a simulated Synthesizer V host. |
 | `pnpm lint` | Lint with Biome. |
 | `pnpm check` | Biome lint + format check. |
 | `pnpm format` | Format the codebase with Biome. |

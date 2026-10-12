@@ -14,6 +14,7 @@
 
 재생 중인 위치에 에디터를 계속 맞춰 따라가게 하는 사이드 패널.
 
+- **Follow Playback State** — 체크하면 Synthesizer V의 재생 버튼이나 단축키로 시작한 재생·반복 재생을 자동으로 추적합니다. 일시정지·정지하면 추적을 멈추고 다시 재생하면 재개합니다. 해제하면 패널의 Play/Pause 버튼 방식으로 돌아가며, 체크박스를 바꿔도 오디오 재생 상태는 바뀌지 않습니다. 기본값은 꺼짐입니다.
 - **Scroll following** — 가로(시간)·세로(피치) 자동 스크롤. 세로 스크롤은 플레이헤드 주변 노트(이전 1개, 이후 5개)의 중앙 피치로 부드럽게 이동하며, 이동하는 데 걸리는 시간(duration, ms)을 조절할 수 있습니다.
 - **Track focusing** — 플레이헤드 아래에서 재생 중인 그룹으로 현재 트랙/그룹을 자동 전환. 대상 트랙을 선택하거나 기능 전체를 끌 수 있습니다.
 - **Playhead position** — 재생 중 플레이헤드가 뷰포트에서 위치할 지점을 정하는 슬라이더. 0.05 ~ 0.95까지 설정할 수 있으며, 값 × 100%가 왼쪽 기준 가로 위치입니다 (예: 0.25 → 25%).
@@ -65,6 +66,7 @@ pnpm build       # JS 스크립트와 Lua-only Parameter Control 번들을 dist/
 | `pnpm build:js` | JavaScript 스크립트 엔트리를 타입체크·번들·ES5 다운레벨해 `dist/*.js`로 출력. `src/parameter-control.ts`는 Parameter Control이 Lua로만 배포되기 때문에 의도적으로 제외됩니다. |
 | `pnpm build:lua` | `src/parameter-control.ts`를 `dist/parameter-control.lua`로 컴파일. |
 | `pnpm typecheck` | 타입체크만 (`tsc --noEmit`). |
+| `pnpm test` | JavaScript를 빌드하고 가상 Synthesizer V 환경에서 재생 동작을 검증. |
 | `pnpm lint` | Biome 린트. |
 | `pnpm check` | Biome 린트 + 포맷 검사. |
 | `pnpm format` | Biome로 코드 포맷. |

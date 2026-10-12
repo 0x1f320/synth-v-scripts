@@ -17,6 +17,7 @@ const CONFIG = {
   followArrangement: false,
   skipInstrumental: true,
   pollInterval: 15,
+  playbackWatchInterval: 100,
   trackWatchInterval: 500,
   pitchLookBehind: 1,
   pitchLookAhead: 5,
@@ -36,6 +37,9 @@ class FollowPlayheadPanel {
   private readonly startButton = SV.create("WidgetValue");
   private readonly allButton = SV.create("WidgetValue");
   private readonly noneButton = SV.create("WidgetValue");
+  private readonly followPlaybackState = this.reactive(false, () => {
+    this.setRunning(this.followPlaybackState.getValue() && this.isPlaying());
+  });
   private readonly trackHorizontal = this.reactive(true);
   private readonly trackVertical = this.reactive(true);
   private readonly easeDuration = this.reactive(CONFIG.easeDurationMs);
@@ -49,6 +53,7 @@ class FollowPlayheadPanel {
 
     this.lastSignature = this.signature();
     this.watchTracks();
+    this.loop();
   }
 
   getState(): SVSidePanelState {
@@ -101,6 +106,7 @@ class FollowPlayheadPanel {
         },
       ]),
     );
+    rows.push(row([checkbox("Follow Playback State", this.followPlaybackState)]));
     rows.push(row([button(this.running ? "Pause" : "Play", this.startButton, 1)]));
 
     return { title: SCRIPT_TITLE, rows };
@@ -169,47 +175,51 @@ class FollowPlayheadPanel {
   }
 
   private toggleRunning(): void {
-    if (this.running) {
-      this.pause();
+    const playing = this.followPlaybackState.getValue() ? this.isPlaying() : this.running;
+    if (playing) {
+      SV.getPlayback().pause();
+      this.setRunning(false);
     } else {
-      this.start();
+      SV.getPlayback().play();
+      this.setRunning(true);
     }
   }
 
-  private start(): void {
-    this.editor = SV.getMainEditor();
-    this.mainNav = this.editor.getNavigation();
-    this.arrNav = CONFIG.followArrangement ? SV.getArrangement().getNavigation() : null;
-    this.lastTrackIdx = -1;
-    this.lastGroupIdx = -1;
-    this.running = true;
-
-    SV.getPlayback().play();
-    this.loop();
-    SV.refreshSidePanel();
+  private isPlaying(): boolean {
+    const status = SV.getPlayback().getStatus();
+    return status === "playing" || status === "looping";
   }
 
-  private pause(): void {
-    this.running = false;
-    SV.getPlayback().pause();
+  private setRunning(running: boolean): void {
+    if (this.running === running) {
+      return;
+    }
+    this.running = running;
+    if (running) {
+      this.editor = SV.getMainEditor();
+      this.mainNav = this.editor.getNavigation();
+      this.arrNav = CONFIG.followArrangement ? SV.getArrangement().getNavigation() : null;
+      this.lastTrackIdx = -1;
+      this.lastGroupIdx = -1;
+      this.applyFollow(this.playheadPosition());
+    }
     SV.refreshSidePanel();
   }
 
   private loop(): void {
-    if (!this.running) {
-      return;
-    }
     this.tick();
-    if (this.running) {
-      SV.setTimeout(CONFIG.pollInterval, () => this.loop());
-    }
+    // One timer chain handles both idle state detection and active following.
+    const interval = this.running ? CONFIG.pollInterval : CONFIG.playbackWatchInterval;
+    SV.setTimeout(interval, () => this.loop());
   }
 
   private tick(): void {
-    const playback = SV.getPlayback();
-    if (playback.getStatus() === "stopped") {
-      this.running = false;
-      SV.refreshSidePanel();
+    if (this.followPlaybackState.getValue()) {
+      this.setRunning(this.isPlaying());
+    } else if (this.running && !this.isPlaying()) {
+      this.setRunning(false);
+    }
+    if (!this.running) {
       return;
     }
     this.applyFollow(this.playheadPosition());
