@@ -79,6 +79,7 @@ Most top-level `src/*.ts` files are JavaScript entry points; `src/parameter-cont
 - **Use [Conventional Commits](https://www.conventionalcommits.org/)** — releases are fully automated with semantic-release:
   - `feat:` bumps the minor version; `fix:`, `perf:`, and `refactor:` bump the patch version.
   - Merging to **`dev`** publishes a prerelease (`x.y.z-dev.N`); merging to **`main`** publishes a stable release.
+  - Each release creates or updates `CHANGELOG.md` and commits it together with the package version. Entries start with the first release after changelog support is enabled; earlier releases remain available on GitHub.
   - Each GitHub release attaches the built `dist/*.js` files and Lua bundles such as `dist/parameter-control.lua` as individual downloadable assets.
 
 ## License

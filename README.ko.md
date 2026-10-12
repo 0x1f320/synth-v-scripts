@@ -79,6 +79,7 @@ pnpm build       # JS 스크립트와 Lua-only Parameter Control 번들을 dist/
 - **[Conventional Commits](https://www.conventionalcommits.org/) 사용** — semantic-release로 릴리즈가 완전 자동화됩니다:
   - `feat:` → minor, `fix:`/`perf:`/`refactor:` → patch.
   - **`dev`** 머지 → 프리릴리즈(`x.y.z-dev.N`), **`main`** 머지 → 정식 릴리즈.
+  - 각 릴리즈는 `CHANGELOG.md`를 생성하거나 갱신하고 패키지 버전과 함께 커밋합니다. CHANGELOG 지원 적용 후 첫 릴리즈부터 기록하며, 이전 릴리즈는 GitHub에서 확인할 수 있습니다.
   - 각 GitHub 릴리즈에 빌드된 `dist/*.js` 파일과 `dist/parameter-control.lua` 같은 Lua 번들이 개별 다운로드 에셋으로 첨부됩니다.
 
 ## 라이선스
