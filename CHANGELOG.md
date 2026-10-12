@@ -1,3 +1,9 @@
+## [1.1.0-dev.6](https://github.com/0x1f320/synth-v-scripts/compare/v1.1.0-dev.5...v1.1.0-dev.6) (2026-10-12)
+
+### Bug Fixes
+
+* **release:** publish releases after skipped merge builds ([#15](https://github.com/0x1f320/synth-v-scripts/issues/15)) ([681099e](https://github.com/0x1f320/synth-v-scripts/commit/681099eb158a6db89851efe3d88b75146bab1bcb))
+
 ## [1.1.0-dev.5](https://github.com/0x1f320/synth-v-scripts/compare/v1.1.0-dev.4...v1.1.0-dev.5) (2026-10-12)
 
 ### Bug Fixes
