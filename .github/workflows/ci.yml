@@ -123,9 +123,13 @@ jobs:
           SEMANTIC_RELEASE_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
 
       - if: steps.skip_check.outputs.should_run == 'true'
-        run: pnpm exec semantic-release
+        # GitHub ignores step env overrides of its default GITHUB_* variables.
+        # Set the merged branch context directly on the release process instead.
+        run: |
+          GITHUB_EVENT_NAME=push \
+          GITHUB_REF="refs/heads/${RELEASE_BRANCH}" \
+          GITHUB_SHA="$(git rev-parse HEAD)" \
+          pnpm exec semantic-release
         env:
-          GITHUB_EVENT_NAME: push
-          GITHUB_REF: refs/heads/${{ github.event.pull_request.base.ref }}
-          GITHUB_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          RELEASE_BRANCH: ${{ github.event.pull_request.base.ref }}
           GITHUB_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
