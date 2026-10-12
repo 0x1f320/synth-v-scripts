@@ -25,7 +25,9 @@ A side panel for applying a delta to parameter curves over the selected notes.
 
 - Choose a base parameter, including Tone Shift, Mouth Opening, and Rap Intonation.
 - Choose a base parameter or a specific **Vocal Mode** entry directly from the Target dropdown. Vocal mode entries are read from the selected group's defined vocal modes, falling back to the current group when no group is selected.
-- Use **Define Preset...** at the end of the Target dropdown to create an in-memory preset. In the dialog, set a preset name and move the sliders for every target the preset should control; zero-valued sliders are ignored.
+- Use **Define Preset...** to create a preset. In the dialog, set a preset name and move the sliders for every target the preset should control; zero-valued sliders are ignored.
+- Presets are saved per voicebank (`database.name`) and shared across projects, tracks, and groups using that voicebank. Identification uses the last saved SVP, with group overrides taking precedence over the track's voicebank. Save after changing a voicebank or adding groups. If the voicebank cannot be identified, preset editing is disabled; no group-specific or shared fallback store is used.
+- Existing group presets are imported into the matching voicebank store when their saved project is opened. Original files are preserved, and previously imported presets are not imported again after deletion. Legacy presets whose voicebank cannot be identified remain in their original files.
 - Use **Extract Preset...** to create a preset from the current selection. The script samples enabled parameter and vocal mode values across the selected notes' quantized range, uses the median value for each detected target, and shows only detected targets in the preset dialog.
 - Selecting a saved preset changes the Delta slider to percent mode. Applying a preset uses `entry amount * delta percent`, so a `0.5` Tension entry with Delta `50%` applies `0.25`.
 - Adjust the delta with a slider, then apply it to the selected notes' time ranges.
@@ -66,7 +68,8 @@ pnpm build       # build JS scripts and the Lua-only Parameter Control bundle in
 | `pnpm build:js` | Type-check, bundle, and downlevel JavaScript script entries to `dist/*.js`; `src/parameter-control.ts` is intentionally excluded because Parameter Control is distributed only as Lua. |
 | `pnpm build:lua` | Compile `src/parameter-control.ts` to `dist/parameter-control.lua`. |
 | `pnpm typecheck` | Type-check only (`tsc --noEmit`). |
-| `pnpm test` | Build JavaScript and test playback behavior with a simulated Synthesizer V host. |
+| `pnpm test` | Build JavaScript and test playback and Parameter Control with a simulated Synthesizer V host. |
+| `pnpm test:lua` | Build and test Parameter Control in Lua 5.4 (requires `lua` on PATH). |
 | `pnpm lint` | Lint with Biome. |
 | `pnpm check` | Biome lint + format check. |
 | `pnpm format` | Format the codebase with Biome. |

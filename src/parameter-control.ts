@@ -39,6 +39,13 @@ import {
   trimAsciiWhitespace,
 } from "@/common/parameter-control-targets";
 
+import {
+  legacyGroupsForVoicebank,
+  type SavedVoiceReference,
+  savedVoicebankName,
+  savedVoiceReferences,
+} from "@/common/parameter-control-voicebank";
+
 interface ParameterChoice {
   label: string;
   typeName: string;
@@ -101,11 +108,13 @@ declare const os:
   | undefined;
 
 const SCRIPT_TITLE = "Parameter Control";
-const PRESET_STORE_FILE_NAME = ".parameter-control.json";
+const PRESET_STORE_FILE_PREFIX = ".parameter-control.";
+const PRESET_STORE_FILE_SUFFIX = ".json";
 const DEBUG_LOG_FILE_NAME = ".parameter-control-debug.log";
 const RESTORE_OFFSET = 1;
 const CONTEXT_WATCH_INTERVAL = 500;
 const PRESET_DIALOG_DELAY = 16;
+const UNKNOWN_VOICEBANK_SCOPE_KEY = "unknown-voicebank";
 const PRESET_DELTA_CHOICE: ParameterChoice = {
   label: "Preset",
   typeName: "",
@@ -219,12 +228,19 @@ class ParameterControlPanel {
   private readonly deletePresetButton = SV.create("WidgetValue");
   private readonly applyButton = SV.create("WidgetValue");
   private readonly invertButton = SV.create("WidgetValue");
-  private readonly presetStore = createPresetFileStore();
+  private presetStore = createPresetFileStore(UNKNOWN_VOICEBANK_SCOPE_KEY);
+  private presetStoreScopeKey = UNKNOWN_VOICEBANK_SCOPE_KEY;
   private presets: ParameterPreset[] = [];
+  private savedProjectText = "";
+  private savedProjectPath = "";
+  private savedVoices: SavedVoiceReference[] = [];
+  private importedLegacyScopes: string[] = [];
+  private migratedProjectText = "";
   private readonly deltaByTarget: TargetStoredValues = {};
   private readonly controlWrites: ControlWriteRecords = {};
   private nextPresetId = 1;
   private lastParameterIndex = 0;
+  private lastTargetChoices: ParameterTargetChoice[] = [];
   private resolvingParameter = false;
   private resettingButton = false;
   private lastContextSignature = "";
@@ -233,11 +249,12 @@ class ParameterControlPanel {
   private restoringDeltaValue = false;
 
   constructor() {
-    this.loadStoredState();
+    this.refreshSavedProject();
+    this.loadPresetStoreForScope(this.currentVoicebankScopeKey());
     debugLog("panel constructed");
     this.persistState();
     this.definePresetButton.setValue(false);
-    this.definePresetButton.setEnabled(true);
+    this.definePresetButton.setEnabled(this.presetStore.available);
     this.definePresetButton.setValueChangeCallback((value) =>
       this.runButtonAction(this.definePresetButton, "Define Preset", () =>
         this.deferPresetDialog(value),
@@ -273,13 +290,14 @@ class ParameterControlPanel {
   }
 
   getState(): SVSidePanelState {
+    this.ensurePresetStoreForCurrentVoicebank();
     const choices = this.targetChoices();
     this.ensureParameterIndex(choices);
     const choice = this.currentDeltaChoice(choices);
     const actionState = presetActionState(this.currentTarget(choices));
     const hasSelectedNotes = this.hasSelectedNotes();
-    this.definePresetButton.setEnabled(true);
-    this.extractPresetButton.setEnabled(hasSelectedNotes);
+    this.definePresetButton.setEnabled(this.presetStore.available);
+    this.extractPresetButton.setEnabled(hasSelectedNotes && this.presetStore.available);
     this.deletePresetButton.setEnabled(actionState.deletePresetEnabled);
     this.applyButton.setEnabled(hasSelectedNotes);
     const deltaLimit = this.deltaLimit(choice);
@@ -305,7 +323,15 @@ class ParameterControlPanel {
 
     return {
       title: SCRIPT_TITLE,
-      rows,
+      rows: [
+        {
+          type: "Label",
+          text: this.currentSavedVoicebankName()
+            ? `Presets: ${this.currentSavedVoicebankName()} (last saved project)`
+            : "Presets unavailable: assign a voicebank and save the project.",
+        },
+        ...rows,
+      ],
     };
   }
 
@@ -473,7 +499,26 @@ class ParameterControlPanel {
   }
 
   private targetChoices(): ParameterTargetChoice[] {
-    return buildTargetChoices(this.availableParameterChoices(), this.presets);
+    const choices = buildTargetChoices(this.availableParameterChoices(), this.presets);
+    const previous = this.lastTargetChoices;
+    if (
+      previous.length > 0 &&
+      (previous.length !== choices.length ||
+        previous.some((choice, index) => targetValueKey(choice) !== targetValueKey(choices[index])))
+    ) {
+      const selected = previous[this.lastParameterIndex];
+      const key = targetValueKey(selected);
+      const nextIndex = choices.findIndex((choice) => targetValueKey(choice) === key);
+      if (nextIndex >= 0) {
+        this.saveDeltaForIndex(previous, this.lastParameterIndex);
+      }
+      const index = Math.max(0, nextIndex);
+      this.setParameterIndex(index);
+      this.lastParameterIndex = index;
+      this.restoreDeltaForChoice(choices[index]);
+    }
+    this.lastTargetChoices = choices;
+    return choices;
   }
 
   private availableParameterChoices(): ParameterChoice[] {
@@ -611,6 +656,9 @@ class ParameterControlPanel {
   }
 
   private editOrDefinePreset(): void {
+    if (!this.canEditPresets()) {
+      return;
+    }
     const target = this.currentTarget();
     debugLog(`Define Preset: resolved target ${target.label}`);
     if (isPresetChoice(target)) {
@@ -640,6 +688,9 @@ class ParameterControlPanel {
   }
 
   private extractPreset(): void {
+    if (!this.canEditPresets()) {
+      return;
+    }
     debugLog("Extract Preset: start");
     const editor = SV.getMainEditor();
     const notes = editor.getSelection().getSelectedNotes();
@@ -698,6 +749,10 @@ class ParameterControlPanel {
   }
 
   private confirmDeleteSelectedPreset(): void {
+    if (!this.canEditPresets()) {
+      return;
+    }
+    const scopeKey = this.presetStoreScopeKey;
     const target = this.currentTarget();
     if (!isPresetChoice(target)) {
       return;
@@ -715,7 +770,7 @@ class ParameterControlPanel {
       SV.showCustomDialogAsync(form, (result) => {
         const status = normalizeDialogStatus(dialogResultStatus(result));
         debugLog(`Delete Preset: confirmation returned ${status}`);
-        if (status === "ok") {
+        if (status === "ok" && this.canEditPresets(scopeKey)) {
           this.deletePresetById(target.presetId);
         }
       });
@@ -776,6 +831,8 @@ class ParameterControlPanel {
   }
 
   private openPresetSliderDialog(draft: ParameterPreset, entryChoices: ParameterChoice[]): void {
+    const scopeKey = this.presetStoreScopeKey;
+    const isNewPreset = !this.hasPresetId(draft.id);
     const form = this.presetDialogForm(draft, entryChoices);
     debugLog(`Define Preset: form widgets ${String(form.widgets.length)}`);
     try {
@@ -784,7 +841,13 @@ class ParameterControlPanel {
         debugLog(
           `Define Preset: showCustomDialogAsync returned ${String(dialogResultStatus(result))}`,
         );
-        this.handlePresetDialogResult(draft, entryChoices, result);
+        if (
+          normalizeDialogStatus(dialogResultStatus(result)) === "ok" &&
+          !this.canEditPresets(scopeKey)
+        ) {
+          return;
+        }
+        this.handlePresetDialogResult(draft, entryChoices, result, isNewPreset);
       });
       debugLog("Define Preset: showCustomDialogAsync scheduled");
     } catch (error) {
@@ -797,6 +860,7 @@ class ParameterControlPanel {
     draft: ParameterPreset,
     entryChoices: ParameterChoice[],
     result: SVDialogResult | undefined,
+    isNewPreset: boolean,
   ): void {
     const status = normalizeDialogStatus(dialogResultStatus(result));
     const answers = dialogResultAnswers(result);
@@ -807,6 +871,13 @@ class ParameterControlPanel {
       return;
     }
 
+    if (isNewPreset) {
+      // Migration can add presets while this asynchronous dialog is open.
+      draft.id = `preset-${this.nextAvailablePresetId()}`;
+    } else if (!this.hasPresetId(draft.id)) {
+      this.showMessage("This preset no longer exists. Reopen the preset dialog.");
+      return;
+    }
     draft.name = this.normalizePresetName(answers.name, draft.name);
     draft.entries = replacePresetEntriesFromSliderAnswers(
       draft.entries,
@@ -900,7 +971,7 @@ class ParameterControlPanel {
       this.presets[existingIndex] = savedPreset;
     } else {
       this.presets.push(savedPreset);
-      this.nextPresetId += 1;
+      this.nextPresetId = this.nextAvailablePresetId();
     }
 
     const choices = this.targetChoices();
@@ -947,12 +1018,99 @@ class ParameterControlPanel {
     this.restoreSettings(store.settings);
   }
 
+  private ensurePresetStoreForCurrentVoicebank(): void {
+    const scopeKey = this.currentVoicebankScopeKey();
+    if (scopeKey === this.presetStoreScopeKey) {
+      this.importLegacyGroupPresets();
+      return;
+    }
+
+    const previousScopeKey = this.presetStoreScopeKey;
+    this.persistState();
+    debugLog(`Define Preset: preset scope changed ${previousScopeKey} -> ${scopeKey}`);
+    this.loadPresetStoreForScope(scopeKey);
+  }
+
+  private loadPresetStoreForScope(scopeKey: string): void {
+    this.presetStoreScopeKey = scopeKey;
+    this.presetStore = createPresetFileStore(scopeKey);
+    this.presetStoreWarningShown = false;
+    this.resetStoredStateDefaults();
+    this.loadStoredState();
+    this.importLegacyGroupPresets();
+  }
+
+  private importLegacyGroupPresets(): void {
+    if (this.migratedProjectText === this.savedProjectText) {
+      return;
+    }
+    this.migratedProjectText = this.savedProjectText;
+    const name = this.currentSavedVoicebankName();
+    if (!name) {
+      return;
+    }
+    let changed = false;
+    legacyGroupsForVoicebank(this.savedVoices, name).forEach((groupId) => {
+      const scope = `group-${stableScopeToken(groupId)}`;
+      if (this.importedLegacyScopes.indexOf(scope) >= 0) {
+        return;
+      }
+      const legacy = createPresetFileStore(scope).load();
+      if (legacy.presets.length === 0) {
+        return;
+      }
+      legacy.presets.forEach((preset) => {
+        const signature = serializeParameterControlStore([{ ...preset, id: "" }]);
+        if (
+          this.presets.some(
+            (existing) => serializeParameterControlStore([{ ...existing, id: "" }]) === signature,
+          )
+        ) {
+          return;
+        }
+        this.presets.push({ ...preset, id: `preset-${this.nextAvailablePresetId()}` });
+      });
+      this.importedLegacyScopes.push(scope);
+      changed = true;
+    });
+    if (changed) {
+      this.nextPresetId = this.nextAvailablePresetId();
+      this.persistState();
+    }
+  }
+
+  private resetStoredStateDefaults(): void {
+    this.loadingStoredState = true;
+    this.presets = [];
+    this.importedLegacyScopes = [];
+    this.migratedProjectText = "";
+    this.clearObject(this.deltaByTarget);
+    this.clearObject(this.controlWrites);
+    this.nextPresetId = 1;
+    this.lastParameterIndex = 0;
+    this.lastTargetChoices = [];
+    this.setParameterIndex(0);
+    this.delta.setValue(0);
+    this.easing.setValue(0);
+    this.easingLeft.setValue(true);
+    this.easingRight.setValue(true);
+    this.easingPlacement.setValue(0);
+    this.loadingStoredState = false;
+  }
+
+  private clearObject<T>(value: { [key: string]: T }): void {
+    for (const key in value) {
+      delete value[key];
+    }
+  }
+
   private restoreSettings(settings: ParameterControlSettings | undefined): void {
     if (!settings) {
       return;
     }
 
     this.loadingStoredState = true;
+    this.importedLegacyScopes = (settings.importedLegacyScopes ?? []).slice();
     this.copyDeltaByTarget(settings.deltaByTarget);
     this.copyControlWrites(settings.controlWrites);
     const choices = this.targetChoices();
@@ -1044,12 +1202,13 @@ class ParameterControlPanel {
     debugLog("Define Preset: preset store write failed");
     if (!this.presetStoreWarningShown) {
       this.presetStoreWarningShown = true;
-      this.showMessage(`Could not save presets to ${PRESET_STORE_FILE_NAME}.`);
+      this.showMessage(`Could not save presets to ${String(this.presetStore.path)}.`);
     }
   }
 
   private currentSettings(choices: ParameterTargetChoice[]): ParameterControlSettings {
     return {
+      importedLegacyScopes: this.importedLegacyScopes.slice(),
       selectedTargetKey: targetValueKey(choices[this.lastParameterIndex]),
       deltaByTarget: { ...this.deltaByTarget },
       easingAmount: this.clamp(Number(this.easing.getValue()) || 0, [0, 100]),
@@ -1096,13 +1255,15 @@ class ParameterControlPanel {
   private contextSignature(): string {
     try {
       const reference = this.currentReference();
-      return `${reference.getTarget().getUUID()}:${this.vocalModeNames().join(",")}`;
+      return `${this.currentVoicebankScopeKey()}:${reference.getTarget().getUUID()}:${this.vocalModeNames().join(",")}`;
     } catch (_error) {
       return "";
     }
   }
 
   private watchContext(): void {
+    this.refreshSavedProject();
+    this.ensurePresetStoreForCurrentVoicebank();
     const signature = this.contextSignature();
     if (signature !== this.lastContextSignature) {
       this.lastContextSignature = signature;
@@ -1110,6 +1271,63 @@ class ParameterControlPanel {
       SV.refreshSidePanel();
     }
     SV.setTimeout(CONTEXT_WATCH_INTERVAL, () => this.watchContext());
+  }
+
+  private refreshSavedProject(): void {
+    try {
+      const path = SV.getProject().getFileName();
+      const text = readTextFile(path);
+      if (path === this.savedProjectPath && text === this.savedProjectText) {
+        return;
+      }
+      this.savedProjectPath = path;
+      this.savedProjectText = text ?? "";
+      this.savedVoices = text ? savedVoiceReferences(text) : [];
+    } catch (_error) {
+      this.savedProjectText = "";
+      this.savedVoices = [];
+    }
+  }
+
+  private currentSavedVoicebankName(): string | undefined {
+    try {
+      const reference = this.currentReference();
+      // Parameter Control is Lua-only; native host indices start at 1.
+      const main = reference.getParent().getGroupReference(1);
+      return savedVoicebankName(
+        this.savedVoices,
+        main.getTarget().getUUID(),
+        reference.getTarget().getUUID(),
+        reference.getTimeOffset(),
+      );
+    } catch (_error) {
+      return undefined;
+    }
+  }
+
+  private currentVoicebankScopeKey(): string {
+    const name = this.currentSavedVoicebankName();
+    if (name) {
+      return `voicebank-${stableScopeToken(`database.name:${name}`)}`;
+    }
+    return UNKNOWN_VOICEBANK_SCOPE_KEY;
+  }
+
+  private canEditPresets(expectedScope?: string): boolean {
+    this.refreshSavedProject();
+    this.ensurePresetStoreForCurrentVoicebank();
+    if (
+      this.presetStore.available &&
+      (!expectedScope || expectedScope === this.presetStoreScopeKey)
+    ) {
+      return true;
+    }
+    this.showMessage(
+      expectedScope
+        ? "The voicebank changed. Reopen the preset dialog for the current voicebank."
+        : "Assign a voicebank and save the project before editing presets.",
+    );
+    return false;
   }
 
   private registerSelectionRefreshCallbacks(): void {
@@ -1606,9 +1824,9 @@ class ParameterControlPanel {
   }
 }
 
-function createPresetFileStore(): PresetFileStore {
-  const path = presetStorePath();
-  if (!path || typeof io === "undefined") {
+function createPresetFileStore(scopeKey: string): PresetFileStore {
+  const path = presetStorePath(scopeKey);
+  if (scopeKey === UNKNOWN_VOICEBANK_SCOPE_KEY || !path || typeof io === "undefined") {
     return {
       available: false,
       load: () => ({ version: 1, presets: [] }),
@@ -1624,8 +1842,56 @@ function createPresetFileStore(): PresetFileStore {
   };
 }
 
-function presetStorePath(): string | undefined {
-  return scriptSiblingPath(PRESET_STORE_FILE_NAME);
+function presetStorePath(scopeKey: string): string | undefined {
+  return scriptSiblingPath(presetStoreFileName(scopeKey));
+}
+
+function presetStoreFileName(scopeKey: string): string {
+  if (scopeKey === UNKNOWN_VOICEBANK_SCOPE_KEY) {
+    return `${PRESET_STORE_FILE_PREFIX}${UNKNOWN_VOICEBANK_SCOPE_KEY}${PRESET_STORE_FILE_SUFFIX}`;
+  }
+  const token = stableScopeToken(scopeKey);
+  return `${PRESET_STORE_FILE_PREFIX}${token}${PRESET_STORE_FILE_SUFFIX}`;
+}
+
+function stableScopeToken(value: string): string {
+  const normalized = value.toLowerCase();
+  let token = "";
+  for (let index = 0; index < normalized.length; index += 1) {
+    const char = normalized.charAt(index);
+    if ((char >= "a" && char <= "z") || (char >= "0" && char <= "9")) {
+      token += char;
+    } else if (token.charAt(token.length - 1) !== "-") {
+      token += "-";
+    }
+  }
+  token = trimTokenSeparators(token);
+  if (token.length > 72) {
+    token = token.substring(0, 72);
+    token = trimTokenSeparators(token);
+  }
+  const hash = stableTextHash(value);
+  return token.length > 0 ? `${token}-${hash}` : hash;
+}
+
+function trimTokenSeparators(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value.charAt(start) === "-") {
+    start += 1;
+  }
+  while (end > start && value.charAt(end - 1) === "-") {
+    end -= 1;
+  }
+  return value.substring(start, end);
+}
+
+function stableTextHash(value: string): string {
+  let hash = 5381;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 33 + value.charCodeAt(index)) % 4294967296;
+  }
+  return String(Math.floor(hash));
 }
 
 function debugLog(message: string): void {
@@ -1770,18 +2036,25 @@ function envValue(name: string): string | undefined {
   }
 }
 
+function readTextFile(path: string): string | undefined {
+  if (!path || typeof io === "undefined") {
+    return undefined;
+  }
+  const file = io.open(path, "r");
+  if (!file) {
+    return undefined;
+  }
+  try {
+    return String(file.read("*a") || "");
+  } finally {
+    file.close();
+  }
+}
+
 function readPresetFile(path: string): ParameterPresetStore {
   try {
-    if (typeof io === "undefined") {
-      return { version: 1, presets: [] };
-    }
-    const file = io.open(path, "r");
-    if (!file) {
-      return { version: 1, presets: [] };
-    }
-    const text = file.read("*a");
-    file.close();
-    return parseParameterControlStore(String(text || ""));
+    const text = readTextFile(path);
+    return text ? parseParameterControlStore(text) : { version: 1, presets: [] };
   } catch (_error) {
     return { version: 1, presets: [] };
   }
