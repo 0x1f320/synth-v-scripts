@@ -234,3 +234,28 @@ test("legacy group presets migrate without ID collisions or reappearing after de
   const restarted = setup(files);
   assert.equal(restarted.target().choices.some((label) => label.startsWith("Preset:")), false);
 });
+
+test("a previous target's slider cannot clamp the next target's restored delta", () => {
+  const app = setup();
+  const select = (label) => {
+    const target = app.target();
+    target.value.setValue(target.choices.indexOf(label));
+  };
+  const delta = () => app.widgets().find((widget) => widget.type === "Slider" && widget.text === "Delta");
+  // The host slider clamps its bound value to its own range and writes the result back.
+  const hostClamp = (slider) => {
+    const value = slider.value.getValue();
+    const clamped = Math.min(slider.maxValue, Math.max(slider.minValue, value));
+    if (clamped !== value) slider.value.setValue(clamped);
+  };
+  select("Vocal Mode: Power");
+  delta().value.setValue(-30);
+  select("Tension");
+  delta().value.setValue(0.15);
+  const tensionSlider = delta();
+  select("Vocal Mode: Power");
+  hostClamp(tensionSlider);
+  assert.equal(delta().value.getValue(), -30);
+  select("Tension");
+  assert.equal(delta().value.getValue(), 0.15);
+});

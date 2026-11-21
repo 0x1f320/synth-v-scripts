@@ -217,12 +217,23 @@ const BASE_PARAMETER_CHOICES: ParameterChoice[] = [
 ];
 
 class ParameterControlPanel {
-  private readonly parameter = this.reactive(0, (value) => this.onParameterChanged(value));
-  private readonly delta = this.reactive(0, () => this.onStoredSettingChanged());
-  private readonly easing = this.reactive(0, () => this.onStoredSettingChanged());
-  private readonly easingLeft = this.reactive(true, () => this.onStoredSettingChanged());
-  private readonly easingRight = this.reactive(true, () => this.onStoredSettingChanged());
-  private readonly easingPlacement = this.reactive(0, () => this.onStoredSettingChanged());
+  private readonly parameter = this.reactive(0, "target", (value) =>
+    this.onParameterChanged(value),
+  );
+  // Each target owns its delta value so a slider is never bound to a value outside its range.
+  // A shared value let the previous target's slider clamp the next target's restored delta
+  // (for example -30 % became -1) and persist the clamped value.
+  private readonly deltaWidgets: { [key: string]: WidgetValue } = {};
+  private readonly easing = this.reactive(0, "easingAmount", () => this.onStoredSettingChanged());
+  private readonly easingLeft = this.reactive(true, "easingLeft", () =>
+    this.onStoredSettingChanged(),
+  );
+  private readonly easingRight = this.reactive(true, "easingRight", () =>
+    this.onStoredSettingChanged(),
+  );
+  private readonly easingPlacement = this.reactive(0, "easingPlacement", () =>
+    this.onStoredSettingChanged(),
+  );
   private readonly definePresetButton = SV.create("WidgetValue");
   private readonly extractPresetButton = SV.create("WidgetValue");
   private readonly deletePresetButton = SV.create("WidgetValue");
@@ -294,6 +305,7 @@ class ParameterControlPanel {
     const choices = this.targetChoices();
     this.ensureParameterIndex(choices);
     const choice = this.currentDeltaChoice(choices);
+    const deltaValue = this.deltaWidget(this.currentTarget(choices));
     const actionState = presetActionState(this.currentTarget(choices));
     const hasSelectedNotes = this.hasSelectedNotes();
     this.definePresetButton.setEnabled(this.presetStore.available);
@@ -305,7 +317,7 @@ class ParameterControlPanel {
     const rows = buildParameterControlRows({
       targetLabels: choices.map((option) => option.label),
       parameterValue: this.parameter,
-      deltaValue: this.delta,
+      deltaValue,
       deltaFormat: choice.format,
       deltaLimit,
       deltaStep: choice.step,
@@ -335,15 +347,50 @@ class ParameterControlPanel {
     };
   }
 
-  private reactive(initial: number | boolean, onChange?: (value: unknown) => void): WidgetValue {
+  private reactive(
+    initial: number | boolean,
+    label: string,
+    onChange?: (value: unknown) => void,
+  ): WidgetValue {
     const widget = SV.create("WidgetValue");
     widget.setValue(initial);
+    let previous: unknown = initial;
     widget.setValueChangeCallback((value) => {
+      debugLog(
+        `widget ${label}: ${String(previous)} -> ${String(value)}; loading=${String(this.loadingStoredState)} restoring=${String(this.restoringDeltaValue)}`,
+      );
+      previous = value;
       if (onChange) {
         onChange(value);
       }
     });
     return widget;
+  }
+
+  private deltaWidget(choice: ParameterTargetChoice | undefined): WidgetValue {
+    const key = targetValueKey(choice) ?? "";
+    const existing = this.deltaWidgets[key];
+    if (existing !== undefined) {
+      return existing;
+    }
+    const widget = this.reactive(this.restoreDeltaValue(choice), `delta[${key}]`, () =>
+      this.onDeltaChanged(key),
+    );
+    this.deltaWidgets[key] = widget;
+    return widget;
+  }
+
+  private onDeltaChanged(key: string): void {
+    if (this.loadingStoredState || this.restoringDeltaValue) {
+      return;
+    }
+    const currentKey = targetValueKey(this.lastTargetChoices[this.lastParameterIndex]) ?? "";
+    if (key !== currentKey) {
+      // A slider of a target that is no longer selected wrote back; its stored delta wins on restore.
+      debugLog(`delta[${key}]: ignored write while ${currentKey} is selected`);
+      return;
+    }
+    this.persistState();
   }
 
   private showMessage(message: string, next?: () => void): void {
@@ -460,6 +507,7 @@ class ParameterControlPanel {
     }
 
     const choices = this.targetChoices();
+    const previousKey = targetValueKey(choices[this.lastParameterIndex]);
     this.saveDeltaForIndex(choices, this.lastParameterIndex);
     const selection = resolveTargetChange({
       choices,
@@ -474,6 +522,9 @@ class ParameterControlPanel {
     this.lastParameterIndex = selection.index;
 
     if (changedParameter) {
+      debugLog(
+        `target changed ${String(previousKey)} -> ${String(targetValueKey(choices[selection.index]))}`,
+      );
       this.restoreDeltaForChoice(choices[selection.index]);
     }
     this.persistState();
@@ -491,8 +542,9 @@ class ParameterControlPanel {
     const choices = this.targetChoices();
     const index = this.parameterIndex(choices);
     const choice = choices[index];
-    const value = this.normalizeDeltaValue(choice, -(Number(this.delta.getValue()) || 0));
-    this.delta.setValue(value);
+    const delta = this.deltaWidget(choice);
+    const value = this.normalizeDeltaValue(choice, -(Number(delta.getValue()) || 0));
+    delta.setValue(value);
     this.saveDeltaForIndex(choices, index);
     this.persistState(choices);
     SV.refreshSidePanel();
@@ -624,7 +676,7 @@ class ParameterControlPanel {
     saveTargetValue(
       this.deltaByTarget,
       choice,
-      this.normalizeDeltaValue(choice, Number(this.delta.getValue()) || 0),
+      this.normalizeDeltaValue(choice, Number(this.deltaWidget(choice).getValue()) || 0),
     );
   }
 
@@ -635,7 +687,7 @@ class ParameterControlPanel {
   private restoreDeltaForChoice(choice: ParameterTargetChoice | undefined): void {
     this.restoringDeltaValue = true;
     try {
-      this.delta.setValue(this.restoreDeltaValue(choice));
+      this.deltaWidget(choice).setValue(this.restoreDeltaValue(choice));
     } finally {
       this.restoringDeltaValue = false;
     }
@@ -793,6 +845,7 @@ class ParameterControlPanel {
     }
     this.presets = remaining;
     delete this.deltaByTarget[`preset:${presetId}`];
+    delete this.deltaWidgets[`preset:${presetId}`];
     const nextChoices = this.targetChoices();
     const nextIndex = this.validSelectionIndexAfterPresetDelete(
       nextChoices,
@@ -1080,6 +1133,7 @@ class ParameterControlPanel {
   }
 
   private resetStoredStateDefaults(): void {
+    debugLog(`reset stored state defaults for scope ${this.presetStoreScopeKey}`);
     this.loadingStoredState = true;
     this.presets = [];
     this.importedLegacyScopes = [];
@@ -1090,7 +1144,9 @@ class ParameterControlPanel {
     this.lastParameterIndex = 0;
     this.lastTargetChoices = [];
     this.setParameterIndex(0);
-    this.delta.setValue(0);
+    for (const key in this.deltaWidgets) {
+      this.deltaWidgets[key].setValue(0);
+    }
     this.easing.setValue(0);
     this.easingLeft.setValue(true);
     this.easingRight.setValue(true);
@@ -1109,6 +1165,9 @@ class ParameterControlPanel {
       return;
     }
 
+    debugLog(
+      `restore settings: target=${String(settings.selectedTargetKey)} easingAmount=${String(settings.easingAmount)}`,
+    );
     this.loadingStoredState = true;
     this.importedLegacyScopes = (settings.importedLegacyScopes ?? []).slice();
     this.copyDeltaByTarget(settings.deltaByTarget);
@@ -1363,7 +1422,7 @@ class ParameterControlPanel {
 
     const group = editor.getCurrentGroup().getTarget();
     const target = this.currentTarget();
-    const delta = Number(this.delta.getValue()) || 0;
+    const delta = Number(this.deltaWidget(target).getValue()) || 0;
     const easing = this.currentEasingOptions();
 
     SV.getProject().newUndoRecord();
