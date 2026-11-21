@@ -1,3 +1,9 @@
+## [1.1.0-dev.7](https://github.com/0x1f320/synth-v-scripts/compare/v1.1.0-dev.6...v1.1.0-dev.7) (2026-11-21)
+
+### Bug Fixes
+
+* **parameter-control:** keep each target's delta when switching targets ([#17](https://github.com/0x1f320/synth-v-scripts/issues/17)) ([bc2432a](https://github.com/0x1f320/synth-v-scripts/commit/bc2432a4e8bbc99c8495cbdf8e1dc8d3bff7b140))
+
 ## [1.1.0-dev.6](https://github.com/0x1f320/synth-v-scripts/compare/v1.1.0-dev.5...v1.1.0-dev.6) (2026-10-12)
 
 ### Bug Fixes
