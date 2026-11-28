@@ -1,3 +1,9 @@
+## [1.1.0-dev.8](https://github.com/0x1f320/synth-v-scripts/compare/v1.1.0-dev.7...v1.1.0-dev.8) (2026-11-28)
+
+### Features
+
+* **note-management:** add Note Management panel with Pitch Line to Points ([#18](https://github.com/0x1f320/synth-v-scripts/issues/18)) ([ce19a5e](https://github.com/0x1f320/synth-v-scripts/commit/ce19a5e2ce2b7ea6fa510aec8c86ad90e4b0fa57))
+
 ## [1.1.0-dev.7](https://github.com/0x1f320/synth-v-scripts/compare/v1.1.0-dev.6...v1.1.0-dev.7) (2026-11-21)
 
 ### Bug Fixes
