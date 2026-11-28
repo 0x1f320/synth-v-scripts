@@ -82,7 +82,38 @@ interface VoiceAttributes {
   [key: string]: any;
 }
 
+/** Discrete pitch anchor (since 2.1.0). Position: blicks relative to the group's time offset; pitch: semitones. */
+interface PitchControlPoint {
+  getPosition(): Blick;
+  setPosition(position: Blick): void;
+  getPitch(): number;
+  setPitch(pitch: number): void;
+  getIndexInParent(): number;
+  clone(): PitchControlPoint;
+  [key: string]: any;
+}
+
+/**
+ * Manual pitch line (since 2.1.0). Each point is [time, value], relative to the curve's anchor
+ * position (blicks) and anchor pitch (semitones).
+ */
+interface PitchControlCurve {
+  getPosition(): Blick;
+  setPosition(position: Blick): void;
+  getPitch(): number;
+  setPitch(pitch: number): void;
+  getPoints(): Array<[Blick, number]>;
+  setPoints(points: Array<[Blick, number]>): void;
+  getIndexInParent(): number;
+  clone(): PitchControlCurve;
+  [key: string]: any;
+}
+
 interface NoteGroup {
+  getNumPitchControls(): number;
+  getPitchControl(index: number): PitchControlPoint | PitchControlCurve;
+  addPitchControl(pitchControl: PitchControlPoint | PitchControlCurve): number;
+  removePitchControl(index: number): void;
   getName(): string;
   setName(name: string): void;
   getNumNotes(): number;
@@ -246,6 +277,8 @@ interface SVHost {
   T(text: string): string;
   create(type: "WidgetValue"): WidgetValue;
   create(type: "Automation", paramType: string): Automation;
+  create(type: "PitchControlPoint"): PitchControlPoint;
+  create(type: "PitchControlCurve"): PitchControlCurve;
   create(type: string, ...args: any[]): any;
   finish(): void;
 

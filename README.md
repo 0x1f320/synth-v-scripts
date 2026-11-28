@@ -33,6 +33,12 @@ A side panel for applying a delta to parameter curves over the selected notes.
 - Adjust the delta with a slider, then apply it to the selected notes' time ranges.
 - If no notes are selected, the script shows a warning dialog instead of editing the project.
 
+### Note Management — `note-management.js`
+
+A side panel that groups note editing tools behind a single **Feature** dropdown. Selecting a feature swaps the controls below the dropdown for that feature's own controls, and each feature keeps its values when you switch away and back.
+
+- **Pitch Line to Points** — converts the manual pitch lines (pitch control curves) under the selected notes into pitch points, one every **Interval** ms (10–500 ms, default 50 ms) of real time, so tempo changes are respected. Only the part of a line inside the selected notes' time ranges is converted; the parts outside stay as pitch lines. Existing pitch points are left untouched. Requires Studio 2 Pro 2.1.2 or later.
+
 ### Hello World — `hello-world.js`
 
 A minimal example script, handy as a template for new scripts.
